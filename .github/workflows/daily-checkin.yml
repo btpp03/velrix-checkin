@@ -2,9 +2,8 @@ name: Velrix 每日签到
 
 on:
   schedule:
-    # 每天 UTC 0:00 = 北京时间 8:00
     - cron: '0 0 * * *'
-  workflow_dispatch:  # 支持手动触发
+  workflow_dispatch:
 
 jobs:
   checkin:
@@ -14,26 +13,39 @@ jobs:
 
       - name: 每日签到
         id: checkin
+        env:
+          VELRIX_COOKIE: ${{ secrets.VELRIX_COOKIE }}
         run: |
           chmod +x ./checkin.sh
-          RESULT=$(./checkin.sh)
-          echo "$RESULT"
-          echo "result<<EOF" >> $GITHUB_OUTPUT
-          echo "$RESULT" >> $GITHUB_OUTPUT
-          echo "EOF" >> $GITHUB_OUTPUT
+          ./checkin.sh
+
+      - name: 查余额
+        id: balance
+        env:
+          VELRIX_COOKIE: ${{ secrets.VELRIX_COOKIE }}
+        run: |
+          BALANCE=$(curl -s "https://api.velrix.net/v1/economy/balance" \
+            -H "Cookie: ${VELRIX_COOKIE}" \
+            -H "Origin: https://www.velrix.net" \
+            -H "User-Agent: Mozilla/5.0" | jq -r '.data.balance // "?"')
+          echo "balance=$BALANCE" >> $GITHUB_OUTPUT
 
       - name: Telegram 通知
-        if: ${{ secrets.TG_BOT_TOKEN != '' && secrets.TG_CHAT_ID != '' }}
+        env:
+          TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
+          TG_CHAT_ID: ${{ secrets.TG_CHAT_ID }}
         run: |
-          RESULT="${{ steps.checkin.outputs.result }}"
-          if echo "$RESULT" | grep -q "✅"; then
+          if [ -z "$TG_BOT_TOKEN" ] || [ -z "$TG_CHAT_ID" ]; then
+            echo "TG not configured, skipping"
+            exit 0
+          fi
+          STATUS="${{ steps.checkin.outcome }}"
+          BALANCE="${{ steps.balance.outputs.balance }}"
+          if [ "$STATUS" = "success" ]; then
             MSG="✅ Velrix 签到成功"
-          elif echo "$RESULT" | grep -q "already_claimed"; then
-            MSG="ℹ️ Velrix 今日已签到"
           else
             MSG="❌ Velrix 签到失败"
           fi
-          BALANCE=$(echo "$RESULT" | grep -oP '\d+(?= 分)')
-          [ -n "$BALANCE" ] && MSG="$MSG%0A余额: $BALANCE 分"
-          curl -s "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
-            -d "chat_id=${{ secrets.TG_CHAT_ID }}&text=$MSG"
+          MSG="${MSG}%0A💰 当前积分: ${BALANCE}"
+          curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TG_CHAT_ID}&text=${MSG}"
