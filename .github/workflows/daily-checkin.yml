@@ -1,0 +1,20 @@
+name: Velrix 每日签到
+
+on:
+  schedule:
+    # 每天早上 8:00 UTC = 北京时间 16:00
+    - cron: '0 0 * * *'
+  workflow_dispatch:  # 支持手动触发
+
+jobs:
+  checkin:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: 每日签到
+        run: |
+          chmod +x ./checkin.sh
+          ./checkin.sh
+        env:
+          VELRIX_COOKIE: ${{ secrets.VELRIX_COOKIE }}
