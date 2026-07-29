@@ -2,7 +2,7 @@ name: Velrix 每日签到
 
 on:
   schedule:
-    # 每天早上 8:00 UTC = 北京时间 16:00
+    # 每天 UTC 0:00 = 北京时间 8:00
     - cron: '0 0 * * *'
   workflow_dispatch:  # 支持手动触发
 
@@ -13,8 +13,27 @@ jobs:
       - uses: actions/checkout@v4
 
       - name: 每日签到
+        id: checkin
         run: |
           chmod +x ./checkin.sh
-          ./checkin.sh
-        env:
-          VELRIX_COOKIE: ${{ secrets.VELRIX_COOKIE }}
+          RESULT=$(./checkin.sh)
+          echo "$RESULT"
+          echo "result<<EOF" >> $GITHUB_OUTPUT
+          echo "$RESULT" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Telegram 通知
+        if: ${{ secrets.TG_BOT_TOKEN != '' && secrets.TG_CHAT_ID != '' }}
+        run: |
+          RESULT="${{ steps.checkin.outputs.result }}"
+          if echo "$RESULT" | grep -q "✅"; then
+            MSG="✅ Velrix 签到成功"
+          elif echo "$RESULT" | grep -q "already_claimed"; then
+            MSG="ℹ️ Velrix 今日已签到"
+          else
+            MSG="❌ Velrix 签到失败"
+          fi
+          BALANCE=$(echo "$RESULT" | grep -oP '\d+(?= 分)')
+          [ -n "$BALANCE" ] && MSG="$MSG%0A余额: $BALANCE 分"
+          curl -s "https://api.telegram.org/bot${{ secrets.TG_BOT_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TG_CHAT_ID }}&text=$MSG"
