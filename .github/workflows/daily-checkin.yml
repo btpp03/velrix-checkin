@@ -19,17 +19,6 @@ jobs:
           chmod +x ./checkin.sh
           ./checkin.sh
 
-      - name: 查余额
-        id: balance
-        env:
-          VELRIX_COOKIE: ${{ secrets.VELRIX_COOKIE }}
-        run: |
-          BALANCE=$(curl -s "https://api.velrix.net/v1/economy/balance" \
-            -H "Cookie: ${VELRIX_COOKIE}" \
-            -H "Origin: https://www.velrix.net" \
-            -H "User-Agent: Mozilla/5.0" | jq -r '.data.balance // "?"')
-          echo "balance=$BALANCE" >> $GITHUB_OUTPUT
-
       - name: Telegram 通知
         env:
           TG_BOT_TOKEN: ${{ secrets.TG_BOT_TOKEN }}
@@ -40,7 +29,10 @@ jobs:
             exit 0
           fi
           STATUS="${{ steps.checkin.outcome }}"
-          BALANCE="${{ steps.balance.outputs.balance }}"
+          BALANCE="${{ steps.checkin.outputs.balance }}"
+          if [ -z "$BALANCE" ] || [ "$BALANCE" = "unknown" ]; then
+            BALANCE="?"
+          fi
           if [ "$STATUS" = "success" ]; then
             MSG="✅ Velrix 签到成功"
           else
