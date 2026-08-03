@@ -51,24 +51,32 @@ for i in $(seq 0 $((ACCOUNT_COUNT - 1))); do
     -H "Origin: https://www.velrix.net" \
     -H "User-Agent: Mozilla/5.0")
 
-  SUCCESS=$(echo "$RESULT" | jq -r '.success // empty')
-  if [ "$SUCCESS" = "true" ]; then
-    echo "✅ 签到成功！"
-    STATUS="claimed"
-  elif [ "$SUCCESS" = "false" ]; then
-    ERROR=$(echo "$RESULT" | jq -r '.error')
-    if [ "$ERROR" = "already_claimed" ]; then
+  echo "  API 响应: $RESULT"
+
+  # 解析响应 — 先检查是否是有效 JSON
+  if ! echo "$RESULT" | jq -e . >/dev/null 2>&1; then
+    echo "❌ API 返回非 JSON（cookie 可能失效）"
+    STATUS="error"
+  else
+    SUCCESS=$(echo "$RESULT" | jq -r '.success // ""')
+    ERROR=$(echo "$RESULT" | jq -r '.error // ""')
+
+    if [ "$SUCCESS" = "true" ]; then
+      echo "✅ 签到成功！"
+      STATUS="claimed"
+    elif [ "$ERROR" = "already_claimed" ] || echo "$RESULT" | grep -q "already_claimed"; then
       echo "ℹ️  今天已签过了"
+      NEXT=$(echo "$RESULT" | jq -r '.details.nextClaimAt // "?"')
+      echo "   下次签到: $NEXT"
       STATUS="already_claimed"
-    else
+    elif [ "$SUCCESS" = "false" ]; then
       MSG=$(echo "$RESULT" | jq -r '.message // "未知错误"')
       echo "❌ 签到失败: $MSG"
       STATUS="error"
+    else
+      echo "❌ 签到失败（未知响应）"
+      STATUS="error"
     fi
-  else
-    echo "❌ 签到失败（API 无响应或 cookie 失效）"
-    echo "$RESULT"
-    STATUS="error"
   fi
 
   # 查余额
