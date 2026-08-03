@@ -11,9 +11,10 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: 每日签到
+      - name: 每日签到（多账号）
         id: checkin
         env:
+          VELRIX_COOKIES: ${{ secrets.VELRIX_COOKIES }}
           VELRIX_COOKIE: ${{ secrets.VELRIX_COOKIE }}
         run: |
           chmod +x ./checkin.sh
@@ -29,18 +30,14 @@ jobs:
             exit 0
           fi
           STATUS="${{ steps.checkin.outcome }}"
-          BALANCE="${{ steps.checkin.outputs.balance }}"
-          CHECKIN_RESULT="${{ steps.checkin.outputs.result }}"
-          if [ -z "$BALANCE" ] || [ "$BALANCE" = "unknown" ]; then
-            BALANCE="?"
-          fi
-          if [ "$STATUS" = "success" ] && [ "$CHECKIN_RESULT" = "claimed" ]; then
-            MSG="✅ Velrix 签到成功 (+50)"
-          elif [ "$STATUS" = "success" ] && [ "$CHECKIN_RESULT" = "already_claimed" ]; then
-            MSG="ℹ️ Velrix 今天已签过"
+          SUMMARY="${{ steps.checkin.outputs.summary }}"
+          if [ "$STATUS" = "success" ]; then
+            TITLE="✅ Velrix 签到完成"
           else
-            MSG="❌ Velrix 签到失败"
+            TITLE="⚠️ Velrix 签到（部分失败）"
           fi
-          MSG="${MSG}%0A💰 当前积分: ${BALANCE}"
+          MSG="${TITLE}%0A${SUMMARY}"
+          # 转义换行
+          MSG=$(echo "$MSG" | sed 's/\\n/%0A/g')
           curl -s "https://api.telegram.org/bot${TG_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TG_CHAT_ID}&text=${MSG}"
