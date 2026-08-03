@@ -30,11 +30,14 @@ jobs:
           fi
           STATUS="${{ steps.checkin.outcome }}"
           BALANCE="${{ steps.checkin.outputs.balance }}"
+          CHECKIN_RESULT="${{ steps.checkin.outputs.result }}"
           if [ -z "$BALANCE" ] || [ "$BALANCE" = "unknown" ]; then
             BALANCE="?"
           fi
-          if [ "$STATUS" = "success" ]; then
-            MSG="✅ Velrix 签到成功"
+          if [ "$STATUS" = "success" ] && [ "$CHECKIN_RESULT" = "claimed" ]; then
+            MSG="✅ Velrix 签到成功 (+50)"
+          elif [ "$STATUS" = "success" ] && [ "$CHECKIN_RESULT" = "already_claimed" ]; then
+            MSG="ℹ️ Velrix 今天已签过"
           else
             MSG="❌ Velrix 签到失败"
           fi

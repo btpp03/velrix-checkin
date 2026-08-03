@@ -11,6 +11,7 @@ echo "时间: $(date '+%Y-%m-%d %H:%M:%S')"
 # 检查 cookie 是否设置
 if [ -z "$COOKIE" ]; then
   echo "❌ VELRIX_COOKIE 未设置或为空"
+  echo "result=error" >> $GITHUB_OUTPUT
   exit 1
 fi
 
@@ -26,6 +27,7 @@ RESULT=$(curl -s -X POST "$API/v1/economy/daily" \
 SUCCESS=$(echo "$RESULT" | jq -r '.success')
 if [ "$SUCCESS" = "true" ]; then
   echo "✅ 签到成功！"
+  echo "result=claimed" >> $GITHUB_OUTPUT
 elif [ "$SUCCESS" = "false" ]; then
   ERROR=$(echo "$RESULT" | jq -r '.error')
   MSG=$(echo "$RESULT" | jq -r '.message')
@@ -33,13 +35,16 @@ elif [ "$SUCCESS" = "false" ]; then
     echo "ℹ️  今天已签过了"
     NEXT=$(echo "$RESULT" | jq -r '.details.nextClaimAt')
     echo "   下次签到: $NEXT"
+    echo "result=already_claimed" >> $GITHUB_OUTPUT
   else
     echo "❌ 签到失败: $MSG"
+    echo "result=error" >> $GITHUB_OUTPUT
     exit 1
   fi
 else
   echo "❌ 签到失败（API 无响应或 cookie 失效）"
   echo "$RESULT"
+  echo "result=error" >> $GITHUB_OUTPUT
   exit 1
 fi
 
